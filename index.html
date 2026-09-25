@@ -29,11 +29,11 @@
       --chalk-dim: #9C978C;
     }
   }
-  html { scroll-padding-top: env(safe-area-inset-top, 0px); height: 100%; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); min-height: 100%; }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    height: 100%;
+    min-height: 100%;
     background: var(--track);
     color: var(--chalk);
     font-family: 'Inter', -apple-system, sans-serif;
@@ -41,6 +41,8 @@
     align-items: center;
     justify-content: center;
     padding: 28px 20px;
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
   }
   body::before {
     content: "";
@@ -183,6 +185,65 @@
     visibility: hidden;
   }
   .result-unit.show { visibility: visible; }
+  .save-btn {
+    display: none;
+    -webkit-appearance: none;
+    appearance: none;
+    border: 1px solid var(--red);
+    background: transparent;
+    color: var(--chalk);
+    font-family: 'Oswald', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 11px 20px;
+    border-radius: 7px;
+    margin-top: 20px;
+    cursor: pointer;
+    transition: background .15s ease, transform .1s ease;
+  }
+  .save-btn.show { display: inline-block; }
+  .save-btn:active { transform: scale(0.97); background: var(--red-dim); }
+  .save-btn.saved { border-color: var(--lane); color: var(--lane); }
+
+  .saved {
+    margin-top: 26px;
+  }
+  .saved:empty { margin-top: 0; }
+  .saved-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 2px;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+  }
+  .saved-row .dist {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    color: var(--lane);
+    width: 32px;
+  }
+  .saved-row .time {
+    flex: 1;
+    color: var(--chalk-dim);
+    padding: 0 8px;
+  }
+  .saved-row .pace {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+  }
+  .saved-row .del {
+    -webkit-appearance: none;
+    appearance: none;
+    border: none;
+    background: none;
+    color: var(--chalk-dim);
+    font-size: 18px;
+    line-height: 1;
+    padding: 4px 0 4px 14px;
+    cursor: pointer;
+  }
   @media (prefers-reduced-motion: reduce) {
     .result-value { transition: none; }
   }
@@ -211,7 +272,10 @@
       <div class="result-label">average pace</div>
       <div class="result-value placeholder" id="paceVal">enter a time</div>
       <div class="result-unit" id="resultUnit">per mile</div>
+      <button class="save-btn" id="saveBtn">Save split</button>
     </div>
+
+    <div class="saved" id="saved"></div>
   </div>
 
 <script>
@@ -226,6 +290,54 @@
   const fieldLabelEl = document.getElementById('fieldLabel');
   const tab5k = document.getElementById('tab5k');
   const tab3k = document.getElementById('tab3k');
+  const saveBtn = document.getElementById('saveBtn');
+  const savedEl = document.getElementById('saved');
+
+  let currentPace = null; // { distance, timeText, paceText }
+
+  function loadSplits() {
+    try {
+      return JSON.parse(localStorage.getItem('paceSplits') || '[]');
+    } catch (e) { return []; }
+  }
+  function writeSplits(list) {
+    try { localStorage.setItem('paceSplits', JSON.stringify(list)); } catch (e) {}
+  }
+  function renderSplits() {
+    const list = loadSplits();
+    savedEl.innerHTML = '';
+    list.forEach((item, i) => {
+      const row = document.createElement('div');
+      row.className = 'saved-row';
+      row.innerHTML =
+        '<span class="dist">' + item.distance + 'K</span>' +
+        '<span class="time">' + item.timeText + '</span>' +
+        '<span class="pace">' + item.paceText + '/mi</span>' +
+        '<button class="del" data-i="' + i + '" aria-label="Delete">×</button>';
+      savedEl.appendChild(row);
+    });
+    savedEl.querySelectorAll('.del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const list2 = loadSplits();
+        list2.splice(parseInt(btn.dataset.i, 10), 1);
+        writeSplits(list2);
+        renderSplits();
+      });
+    });
+  }
+  saveBtn.addEventListener('click', () => {
+    if (!currentPace) return;
+    const list = loadSplits();
+    list.unshift(currentPace);
+    writeSplits(list);
+    renderSplits();
+    saveBtn.textContent = 'Saved';
+    saveBtn.classList.add('saved');
+    setTimeout(() => {
+      saveBtn.textContent = 'Save split';
+      saveBtn.classList.remove('saved');
+    }, 1200);
+  });
 
   function setDistance(d) {
     distance = d;
@@ -244,6 +356,8 @@
     paceValEl.classList.add('placeholder');
     paceValEl.classList.remove('ready');
     resultUnitEl.classList.remove('show');
+    saveBtn.classList.remove('show');
+    currentPace = null;
   }
 
   function calc() {
@@ -263,11 +377,19 @@
     const roundedTotal = Math.round(paceSecondsPerMile);
     const pMin = Math.floor(roundedTotal / 60);
     const pSec = roundedTotal % 60;
+    const paceText = pMin + ':' + String(pSec).padStart(2, '0');
 
-    paceValEl.textContent = pMin + ':' + String(pSec).padStart(2, '0');
+    paceValEl.textContent = paceText;
     paceValEl.classList.remove('placeholder');
     paceValEl.classList.add('ready');
     resultUnitEl.classList.add('show');
+    saveBtn.classList.add('show');
+
+    currentPace = {
+      distance: distance,
+      timeText: minsEl.value + ':' + secsEl.value,
+      paceText: paceText
+    };
   }
 
   [minsEl, secsEl].forEach(el => {
@@ -295,6 +417,7 @@
 
   window.addEventListener('DOMContentLoaded', () => minsEl.focus());
   minsEl.focus();
+  renderSplits();
 </script>
 </body>
 </html>
