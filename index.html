@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pace Split</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --track: #171613;
+    --track-2: #201e19;
+    --chalk: #F2EEE4;
+    --chalk-dim: #9C978C;
+    --red: #C8432B;
+    --red-dim: #7a2c1e;
+    --lane: #E0AC1F;
+    --line: #33302a;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --track: #171613;
+      --track-2: #201e19;
+      --chalk: #F2EEE4;
+      --chalk-dim: #9C978C;
+    }
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); height: 100%; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    height: 100%;
+    background: var(--track);
+    color: var(--chalk);
+    font-family: 'Inter', -apple-system, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 20px;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+      repeating-linear-gradient(180deg, transparent, transparent 78px, var(--track-2) 78px, var(--track-2) 80px);
+    opacity: .5;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 380px;
+  }
+  .title-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 30px;
+  }
+  h1 {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-size: 22px;
+    margin: 0;
+    letter-spacing: 0.01em;
+  }
+  .lane-num {
+    font-family: 'Oswald', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--lane);
+    letter-spacing: 0.04em;
+  }
+  .field-label {
+    font-size: 13px;
+    color: var(--chalk-dim);
+    margin-bottom: 10px;
+  }
+  .time-input {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 26px;
+  }
+  .time-input input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid var(--line);
+    color: var(--chalk);
+    font-family: 'Oswald', sans-serif;
+    font-size: 44px;
+    font-weight: 600;
+    text-align: center;
+    padding: 6px 0 10px;
+    -moz-appearance: textfield;
+    transition: border-color .2s ease;
+  }
+  .time-input input::-webkit-outer-spin-button,
+  .time-input input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .time-input input:focus { outline: none; border-color: var(--red); }
+  .time-input .colon {
+    font-family: 'Oswald', sans-serif;
+    font-size: 34px;
+    color: var(--chalk-dim);
+    padding-bottom: 12px;
+  }
+  .sub-label {
+    text-align: center;
+    font-size: 12px;
+    color: var(--chalk-dim);
+    margin-top: -18px;
+    margin-bottom: 28px;
+    display: flex;
+    justify-content: space-around;
+  }
+  .result {
+    margin-top: 30px;
+    border-top: 1px solid var(--line);
+    padding-top: 26px;
+    text-align: center;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity .35s ease, transform .35s ease;
+  }
+  .result.show { opacity: 1; transform: translateY(0); }
+  .result-label {
+    font-size: 12px;
+    color: var(--chalk-dim);
+    margin-bottom: 6px;
+  }
+  .result-value {
+    font-family: 'Oswald', sans-serif;
+    font-size: 64px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--lane);
+  }
+  .result-unit {
+    font-size: 15px;
+    color: var(--chalk-dim);
+    margin-top: 8px;
+  }
+  .error {
+    color: var(--red);
+    font-size: 13px;
+    text-align: center;
+    margin-top: -18px;
+    margin-bottom: 20px;
+    min-height: 16px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .result { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="title-row">
+      <h1>Pace Split</h1>
+      <span class="lane-num">5K → MI</span>
+    </div>
+
+    <div class="field-label">5K finish time</div>
+    <div class="time-input">
+      <input type="number" id="mins" inputmode="numeric" min="0" max="59" placeholder="00" />
+      <span class="colon">:</span>
+      <input type="number" id="secs" inputmode="numeric" min="0" max="59" placeholder="00" />
+    </div>
+    <div class="sub-label"><span>minutes</span><span>seconds</span></div>
+
+    <div class="error" id="err"></div>
+
+    <div class="result" id="result">
+      <div class="result-label">average pace</div>
+      <div class="result-value" id="paceVal">0:00</div>
+      <div class="result-unit">per mile</div>
+    </div>
+  </div>
+
+<script>
+  const MILE_PER_5K = 3.10686; // miles in 5 kilometers
+  const minsEl = document.getElementById('mins');
+  const secsEl = document.getElementById('secs');
+  const errEl = document.getElementById('err');
+  const resultEl = document.getElementById('result');
+  const paceValEl = document.getElementById('paceVal');
+
+  function calc() {
+    const m = parseInt(minsEl.value, 10) || 0;
+    const s = parseInt(secsEl.value, 10) || 0;
+
+    if (minsEl.value === '' && secsEl.value === '') {
+      errEl.textContent = 'Enter a 5K time first.';
+      resultEl.classList.remove('show');
+      return;
+    }
+    if (s > 59) {
+      errEl.textContent = 'Seconds should be 0–59.';
+      resultEl.classList.remove('show');
+      return;
+    }
+    errEl.textContent = '';
+
+    const totalSeconds = m * 60 + s;
+    const paceSecondsPerMile = totalSeconds / MILE_PER_5K;
+    const roundedTotal = Math.round(paceSecondsPerMile);
+    const pMin = Math.floor(roundedTotal / 60);
+    const pSec = roundedTotal % 60;
+
+    paceValEl.textContent = pMin + ':' + String(pSec).padStart(2, '0');
+    resultEl.classList.add('show');
+  }
+
+  [minsEl, secsEl].forEach(el => {
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') calc(); });
+  });
+
+  minsEl.addEventListener('input', () => {
+    if (minsEl.value.length > 2) minsEl.value = minsEl.value.slice(0, 2);
+    if (minsEl.value.length === 2) secsEl.focus();
+    calc();
+  });
+  secsEl.addEventListener('input', () => {
+    if (secsEl.value.length > 2) secsEl.value = secsEl.value.slice(0, 2);
+    if (secsEl.value.length === 2) secsEl.blur();
+    calc();
+  });
+  secsEl.addEventListener('keydown', e => {
+    if (e.key === 'Backspace' && secsEl.value === '') {
+      e.preventDefault();
+      minsEl.focus();
+      minsEl.value = minsEl.value.slice(0, -1);
+      calc();
+    }
+  });
+
+  window.addEventListener('DOMContentLoaded', () => minsEl.focus());
+  minsEl.focus();
+</script>
+</body>
+</html>
