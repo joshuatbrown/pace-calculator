@@ -78,6 +78,35 @@
     color: var(--lane);
     letter-spacing: 0.04em;
   }
+  .tabs {
+    display: flex;
+    gap: 8px;
+    background: var(--track-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 5px;
+    margin-bottom: 26px;
+  }
+  .tab {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--chalk-dim);
+    font-family: 'Oswald', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 14px 0;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background .18s ease, color .18s ease;
+  }
+  .tab.active {
+    background: var(--red);
+    color: var(--chalk);
+  }
   .field-label {
     font-size: 13px;
     color: var(--chalk-dim);
@@ -126,11 +155,7 @@
     border-top: 1px solid var(--line);
     padding-top: 26px;
     text-align: center;
-    opacity: 0;
-    transform: translateY(6px);
-    transition: opacity .35s ease, transform .35s ease;
   }
-  .result.show { opacity: 1; transform: translateY(0); }
   .result-label {
     font-size: 12px;
     color: var(--chalk-dim);
@@ -141,23 +166,25 @@
     font-size: 64px;
     font-weight: 700;
     line-height: 1;
+    color: var(--chalk-dim);
+    transition: color .2s ease, font-size .2s ease;
+  }
+  .result-value.ready {
     color: var(--lane);
+  }
+  .result-value.placeholder {
+    font-size: 26px;
+    font-weight: 500;
   }
   .result-unit {
     font-size: 15px;
     color: var(--chalk-dim);
     margin-top: 8px;
+    visibility: hidden;
   }
-  .error {
-    color: var(--red);
-    font-size: 13px;
-    text-align: center;
-    margin-top: -18px;
-    margin-bottom: 20px;
-    min-height: 16px;
-  }
+  .result-unit.show { visibility: visible; }
   @media (prefers-reduced-motion: reduce) {
-    .result { transition: none; }
+    .result-value { transition: none; }
   }
 </style>
 </head>
@@ -165,10 +192,14 @@
   <div class="card">
     <div class="title-row">
       <h1>Pace Split</h1>
-      <span class="lane-num">5K → MI</span>
     </div>
 
-    <div class="field-label">5K finish time</div>
+    <div class="tabs" role="tablist">
+      <button class="tab active" id="tab5k" data-dist="5" role="tab" aria-selected="true">5K</button>
+      <button class="tab" id="tab3k" data-dist="3" role="tab" aria-selected="false">3K</button>
+    </div>
+
+    <div class="field-label" id="fieldLabel">5K finish time</div>
     <div class="time-input">
       <input type="number" id="mins" inputmode="numeric" min="0" max="59" placeholder="00" />
       <span class="colon">:</span>
@@ -176,47 +207,67 @@
     </div>
     <div class="sub-label"><span>minutes</span><span>seconds</span></div>
 
-    <div class="error" id="err"></div>
-
     <div class="result" id="result">
       <div class="result-label">average pace</div>
-      <div class="result-value" id="paceVal">0:00</div>
-      <div class="result-unit">per mile</div>
+      <div class="result-value placeholder" id="paceVal">enter a time</div>
+      <div class="result-unit" id="resultUnit">per mile</div>
     </div>
   </div>
 
 <script>
-  const MILE_PER_5K = 3.10686; // miles in 5 kilometers
+  const MILES = { 5: 3.10686, 3: 1.86411 }; // miles per distance (km)
+  let distance = 5;
+
   const minsEl = document.getElementById('mins');
   const secsEl = document.getElementById('secs');
-  const errEl = document.getElementById('err');
   const resultEl = document.getElementById('result');
   const paceValEl = document.getElementById('paceVal');
+  const resultUnitEl = document.getElementById('resultUnit');
+  const fieldLabelEl = document.getElementById('fieldLabel');
+  const tab5k = document.getElementById('tab5k');
+  const tab3k = document.getElementById('tab3k');
+
+  function setDistance(d) {
+    distance = d;
+    tab5k.classList.toggle('active', d === 5);
+    tab3k.classList.toggle('active', d === 3);
+    tab5k.setAttribute('aria-selected', d === 5);
+    tab3k.setAttribute('aria-selected', d === 3);
+    fieldLabelEl.textContent = d + 'K finish time';
+    calc();
+  }
+  tab5k.addEventListener('click', () => setDistance(5));
+  tab3k.addEventListener('click', () => setDistance(3));
+
+  function showPlaceholder() {
+    paceValEl.textContent = 'enter a time';
+    paceValEl.classList.add('placeholder');
+    paceValEl.classList.remove('ready');
+    resultUnitEl.classList.remove('show');
+  }
 
   function calc() {
-    const m = parseInt(minsEl.value, 10) || 0;
-    const s = parseInt(secsEl.value, 10) || 0;
+    const mComplete = minsEl.value.length === 2;
+    const sComplete = secsEl.value.length === 2;
 
-    if (minsEl.value === '' && secsEl.value === '') {
-      errEl.textContent = 'Enter a 5K time first.';
-      resultEl.classList.remove('show');
+    if (!mComplete || !sComplete) {
+      showPlaceholder();
       return;
     }
-    if (s > 59) {
-      errEl.textContent = 'Seconds should be 0–59.';
-      resultEl.classList.remove('show');
-      return;
-    }
-    errEl.textContent = '';
+
+    const m = parseInt(minsEl.value, 10) || 0;
+    const s = Math.min(parseInt(secsEl.value, 10) || 0, 59);
 
     const totalSeconds = m * 60 + s;
-    const paceSecondsPerMile = totalSeconds / MILE_PER_5K;
+    const paceSecondsPerMile = totalSeconds / MILES[distance];
     const roundedTotal = Math.round(paceSecondsPerMile);
     const pMin = Math.floor(roundedTotal / 60);
     const pSec = roundedTotal % 60;
 
     paceValEl.textContent = pMin + ':' + String(pSec).padStart(2, '0');
-    resultEl.classList.add('show');
+    paceValEl.classList.remove('placeholder');
+    paceValEl.classList.add('ready');
+    resultUnitEl.classList.add('show');
   }
 
   [minsEl, secsEl].forEach(el => {
